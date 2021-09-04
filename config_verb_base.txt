@@ -2,4 +2,4 @@
 Число:e,m
 Лицо:1,2,3
 Отрицание:p,n
-Форма:nb
+Форма:nb,po,bb,ps,pd,im,in,pn,pb,pm,de,du,dv

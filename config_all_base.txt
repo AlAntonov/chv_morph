@@ -1,0 +1,5 @@
+Часть_речи:v,n
+Число:e,m
+Лицо:0,1,2,3
+Отрицание:p,n
+Форма:nb,po,bb,ps,pd,im,in,pn,pb,pm,de,du,dv,im,ro,da,me,is,tv,li,pc
