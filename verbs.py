@@ -536,16 +536,16 @@ def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename,
   total_sents = 0
   for form in form_verb_list:
     if form in index_table.keys():
-      sent_numbers = sent_numbers.union(map(int, index_table[form].split(' ')))
+      sent_numbers = sent_numbers.union(map(int, index_table[form]))
   for form2 in form2_verb_list:
     if form2 in index_table.keys():
-      sent_numbers2 = sent_numbers2.union(map(int, index_table[form2].split(' ')))
+      sent_numbers2 = sent_numbers2.union(map(int, index_table[form2]))
   for form in form_noun_list:
     if form in index_table.keys():
-      sent_numbers = sent_numbers.union(map(int, index_table[form].split(' ')))
+      sent_numbers = sent_numbers.union(map(int, index_table[form]))
   for form2 in form2_noun_list:
     if form2 in index_table.keys():
-      sent_numbers2 = sent_numbers2.union(map(int, index_table[form2].split(' ')))
+      sent_numbers2 = sent_numbers2.union(map(int, index_table[form2]))
   if config2_filename is not None:
     sent_numbers = sent_numbers.intersection(sent_numbers2)
   sent_numbers = sorted(sent_numbers)
@@ -562,25 +562,25 @@ def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename,
         for form in form_verb_list:
           form_num = form + str(total_sents)
           if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num].split(' ')
+            verb_list = verb_index_table[form_num]
             for verb in verb_list:
               chv_search_form(verb, verbs_list, trn_verbs_list, conj_verb_table, form_verb_list, verbal=True)
         for form in form_noun_list:
           form_num = form + str(total_sents)
           if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num].split(' ')
+            verb_list = verb_index_table[form_num]
             for verb in verb_list:
               chv_search_noun_form(verb, nouns_list, trn_nouns_list, conj_noun_table, form_noun_list, verbal=True)
         for form2 in form2_verb_list:
           form_num = form2 + str(total_sents)
           if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num].split(' ')
+            verb_list = verb_index_table[form_num]
             for verb in verb_list:
               chv_search_form(verb, verbs_list, trn_verbs_list, conj_verb_table, form2_verb_list, verbal=True)
         for form2 in form2_noun_list:
           form_num = form2 + str(total_sents)
           if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num].split(' ')
+            verb_list = verb_index_table[form_num]
             for verb in verb_list:
               chv_search_noun_form(verb, nouns_list, trn_nouns_list, conj_noun_table, form2_noun_list, verbal=True)
         print('%d:%s' % (total_sents, line))
@@ -612,6 +612,7 @@ def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filen
       for word in words:
         word = check_encoding(word, False)
         word = word.lower()
+        debug = word == "тухсан"
         if word not in cash_dict.keys():
           word_form_found, chosen_verb_form = chv_search_form(word, verbs_list, trn_verbs_list, conj_verb_table, form_verb_list, False)
           noun_form_found, chosen_noun_form = chv_search_noun_form(word, nouns_list, trn_nouns_list, conj_noun_table, form_noun_list, False)
@@ -625,12 +626,16 @@ def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filen
           if word not in cash_dict.keys():
             cash_dict[word] = chosen_form
           if chosen_form in index_dict.keys():
-            index_dict[chosen_form].append(str(total_sents))
+            tmp = index_dict[chosen_form]
+            tmp.append(str(total_sents))
+            index_dict[chosen_form] = tmp
           else:
             index_dict[chosen_form] = [str(total_sents)]
           chosen_form_num = chosen_form + str(total_sents)
           if chosen_form_num in verb_index_dict.keys():
-            verb_index_dict[chosen_form_num].append(word)
+            tmp = verb_index_dict[chosen_form_num]
+            tmp.append(word)
+            verb_index_dict[chosen_form_num] = tmp
           else:
             verb_index_dict[chosen_form_num] = [word]
         if chosen_noun_form != '':
@@ -638,12 +643,16 @@ def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filen
           if word not in cash_dict.keys():
             cash_dict[word] = chosen_form
           if chosen_form in index_dict.keys():
-            index_dict[chosen_form].append(str(total_sents))
+            tmp = index_dict[chosen_form]
+            tmp.append(str(total_sents))
+            index_dict[chosen_form] = tmp
           else:
             index_dict[chosen_form] = [str(total_sents)]
           chosen_form_num = chosen_form + str(total_sents)
           if chosen_form_num in verb_index_dict.keys():
-            verb_index_dict[chosen_form_num].append(word)
+            tmp = verb_index_dict[chosen_form_num]
+            tmp.append(word)
+            verb_index_dict[chosen_form_num] = tmp
           else:
             verb_index_dict[chosen_form_num] =  [word]
       if form_found:
@@ -661,16 +670,15 @@ if __name__ == '__main__':
   trn_noun_filename = 'andreev.ru_noun'
   verb_filename = 'andreev.chv_verb'
   trn_verb_filename = 'andreev.ru_verb'
-  search_filename = 'chv.100K.monocorpus.txt'
+  search_filename = 'chv.10K.monocorpus.txt'
   prnn_filename = 'pronoun_table.txt'
-  config_filename = 'config_all_base.txt'
+  config_filename = 'config.txt'
   config2_filename = 'config2.txt'
   index_filename = 'index.npy'
   
   # chv_conjugate(verb, conj_filename, prnn_filename, '')
   # chv_conjugate_site(verb)
   # chv_deconjugate(verb, verb_filename, trn_verb_filename, conj_filename, verbal=True)
-  
   
   with open(search_filename, encoding="utf-8") as search_file:
     lines = search_file.read().splitlines()
@@ -679,7 +687,7 @@ if __name__ == '__main__':
   index_table_list = []
   verb_index_table_list = []
   procs = []
-  
+  '''
   manager = Manager()
   mp_index_dict = manager.dict()
   mp_verb_index_dict = manager.dict()
@@ -697,7 +705,7 @@ if __name__ == '__main__':
   np.save(index_filename, index_dict)
   verb_index_filename = 'verb_' + index_filename
   np.save(verb_index_filename, verb_index_dict)  
-  
-  #chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, 10, config2_filename)
+  '''
+  chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, 10, None)
   
   print("--- %s seconds ---" % (time.time() - start_time))  
