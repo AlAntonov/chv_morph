@@ -504,7 +504,7 @@ def chv_search_noun_form(noun, nouns_list, trn_nouns_list, noun_table, form_list
     form_found = True
   return form_found, chosen_form[2:]
   
-def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, show_first_sents=0, config2_filename=None):
+def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, show_first_sents=10, config2_filename=None):
   index_table = np.load(index_filename, allow_pickle='TRUE').item()
   verb_index_filename = 'verb_' + index_filename
   verb_index_table = np.load(verb_index_filename, allow_pickle='TRUE').item()
@@ -522,15 +522,15 @@ def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename,
   trn_nouns_list = chv_read_verbs_list(trn_noun_filename)
   form2_verb_list = []
   form2_noun_list = []
+  print("первый список форм")
+  if len(form_verb_list)>0: print(form_verb_list)
+  if len(form_noun_list)>0: print(form_noun_list)
   if config2_filename is not None:
     form2_verb_list = chv_get_form_from_config(config2_filename)
     form2_noun_list = chv_get_form_from_noun_config(config2_filename)
-  print("первый список форм")
-  print(form_verb_list)
-  print(form_noun_list)
-  print("второй список форм")
-  print(form2_verb_list)
-  print(form2_noun_list)
+    print("второй список форм")
+    if len(form2_verb_list)>0: print(form2_verb_list)
+    if len(form2_noun_list)>0: print(form2_noun_list)
   conj_verb_table = chv_read_conj_table(conj_verb_filename, True)
   conj_noun_table = chv_read_conj_table(conj_noun_filename, True)
   total_sents = 0
@@ -585,10 +585,9 @@ def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename,
               chv_search_noun_form(verb, nouns_list, trn_nouns_list, conj_noun_table, form2_noun_list, verbal=True)
         print('%d:%s' % (total_sents, line))
   
-def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_dict, verb_index_dict, proc_index, proc_n, index_filename=None):
-  print(proc_index)
+def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_dict, verb_index_dict, index_filename=None):
   found_sents = 0
-  total_sents = proc_index * proc_n
+  total_sents = 0
   translator = str.maketrans('', '', string.punctuation)
   form_found = False
   word_form_found = False
@@ -661,8 +660,8 @@ def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filen
 
 if __name__ == '__main__':
   start_time = time.time()
-  # verb = sys.argv[1]
-  # form = sys.argv[1]
+  show_first_sents = int(sys.argv[1])
+  has_second_word = int(sys.argv[2])
   
   conj_noun_filename = 'conj_noun_table.txt'
   conj_verb_filename = 'conj_table.txt'
@@ -670,16 +669,13 @@ if __name__ == '__main__':
   trn_noun_filename = 'andreev.ru_noun'
   verb_filename = 'andreev.chv_verb'
   trn_verb_filename = 'andreev.ru_verb'
-  search_filename = 'chv.10K.monocorpus.txt'
+  search_filename = 'chv.100K.monocorpus.txt'
   prnn_filename = 'pronoun_table.txt'
   config_filename = 'config.txt'
   config2_filename = 'config2.txt'
+  if has_second_word != 1: config2_filename = None
   index_filename = 'index.npy'
-  
-  # chv_conjugate(verb, conj_filename, prnn_filename, '')
-  # chv_conjugate_site(verb)
-  # chv_deconjugate(verb, verb_filename, trn_verb_filename, conj_filename, verbal=True)
-  
+    
   with open(search_filename, encoding="utf-8") as search_file:
     lines = search_file.read().splitlines()
   n = len(lines) # 300
@@ -702,10 +698,15 @@ if __name__ == '__main__':
   
   index_dict = mp_index_dict.copy()
   verb_index_dict = mp_verb_index_dict.copy()
+  '''
+  '''
+  index_dict = {}
+  verb_index_dict = {}
+  chv_create_search_index(search_list, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_dict, verb_index_dict, index_filename)
   np.save(index_filename, index_dict)
   verb_index_filename = 'verb_' + index_filename
   np.save(verb_index_filename, verb_index_dict)  
-  '''
-  chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, 10, None)
+  '''  
+  chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, show_first_sents, config2_filename)
   
   print("--- %s seconds ---" % (time.time() - start_time))  
