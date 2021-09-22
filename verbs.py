@@ -2,13 +2,7 @@ import sys
 import string
 import os
 import numpy as np
-import time
-from multiprocessing import Process, Manager
-
-class FullVerb:
-   def __init__(self, form, verb):
-      self.form = form
-      self.verb = verb
+from config import Config
 
 def chv_apply_10_rule(verb, affix, conj_verb):
   # у десяти глаголов на –р (йӗр, кӗр, кӳр, пар, пер, пыр, хур, шӑр, яр конечный звук выпадает
@@ -147,27 +141,6 @@ def get_hs(verb):
     if a in soft:
       return 's'
   return 'n'
-
-def chv_conjugate(verb, conj_filename, prnn_filename, trn_verb):
-  verb = check_encoding(verb, False)
-  verb = verb.lower()
-  conj_table = chv_read_conj_table(conj_filename)
-  prnn_filename = chv_read_conj_table(prnn_filename, True)
-  hs = get_hs(verb)
-  conj_verb_list = []
-  prev_form_title = ''
-  for form in conj_table.keys():
-    if form[0] != hs:
-      continue	
-    text_form = prnn_filename[form[2:5]]
-    form_title = prnn_filename[form[6:10]]
-    conj_verb = chv_apply_rules(verb, conj_table, form)
-    print(text_form + " " + conj_verb)
-    if form_title != prev_form_title:
-      conj_verb_list.append(FullVerb("title",check_encoding(form_title, False)))
-    prev_form_title = form_title
-    conj_verb_list.append(FullVerb(check_encoding(text_form, False),check_encoding(conj_verb, False)))
-  return check_encoding(verb, False), trn_verb, conj_verb_list
 
 def chv_apply_10_derule(verb, i, inf_verbs):
   # у десяти глаголов на –р (йӗр, кӗр, кӳр, пар, пер, пыр, хур, шӑр, яр конечный звук выпадает
@@ -334,56 +307,37 @@ def chv_apply_noun_derules(noun, noun_table, form_list = []):
         for j in range(len(forms),len(im_nouns)):
           forms.append(form)
   return im_nouns, forms
-
-def is_verb(trn_verb):
-  return trn_verb[-2:] == 'ть' or  trn_verb[-4:] == 'ться' or trn_verb[-2:] == 'ти'
   
-def check_encoding(verb, reverse = True):
+def fix_encoding_lower(verb, reverse = True):
+  verb = verb.lower()
   if reverse:
     return verb.replace('ӗ','ĕ').replace('ӑ','ă').replace('ҫ','ç').replace('ӳ','ÿ')
   else:
-    return verb.replace('ĕ','ӗ').replace('ă','ӑ').replace('ç','ҫ').replace('ÿ','ӳ') 
-  
-def chv_read_verbs_list(verb_filename):
-  verbs_list = []
-  location = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-  with open(os.path.join(location, verb_filename), encoding="utf-8") as verb_file:
-    for line in verb_file:
-      verbs_list.append(line[:-1])
-  return verbs_list
+    return verb.replace('ĕ','ӗ').replace('ă','ӑ').replace('ç','ҫ').replace('ÿ','ӳ')
 
-def chv_read_conj_table(conj_filename, reverse = False):
-  conj_table = {}
-  location = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-  with open(os.path.join(location, conj_filename), encoding="utf-8") as conj_file:
-    for line in conj_file:
-      splitted_line = line[:-1].split(':')
-      if reverse:
-        conj_table[splitted_line[1]] = splitted_line[0]
-      else:
-        conj_table[splitted_line[0]] = splitted_line[1]
-  return conj_table  
-  
-def chv_deconjugate(verb, verb_filename, trn_verb_filename, conj_filename, pos, verbal=True):
-  verb = check_encoding(verb, False)
-  verb = verb.lower()
-  conj_table = chv_read_conj_table(conj_filename, True)
-  verbs_list = chv_read_verbs_list(verb_filename)
-  trn_verbs_list = chv_read_verbs_list(trn_verb_filename)
+def chv_search_form(verb, pos, config, form_verb_list, verbal=False):
+  debug = verb == "хӑмпӑ"
+  if pos == "verb":
+    conj_table = config.conj_verb_table
+    words_list = config.verbs_list
+    trn_words_list = config.trn_verbs_list
+    pos_verbal = "глагол"
+    inf_words, forms = chv_apply_derules(verb, conj_table)
+  else:
+    conj_table = config.conj_noun_table
+    words_list = config.nouns_list
+    trn_words_list = config.trn_nouns_list
+    pos_verbal = "существительное"
+    inf_words, forms = chv_apply_noun_derules(verb, conj_table, form_verb_list)
   trn_verb = ''
-  inf_verbs, forms = chv_apply_derules(verb, conj_table)
-  #if verbal:
-    #print(inf_verbs)
-    #print(forms)
   chosen_inv_verb = ''
   chosen_form = ''
   form_index = -1
-  for inf_verb in inf_verbs:
-    # print(inf_verb)
+  form_found = False
+  for inf_verb in inf_words:
     form_index = form_index + 1
-    for index in [i for i, x in enumerate(verbs_list) if x == check_encoding(inf_verb)]:
-      trn_verb_candidate = trn_verbs_list[index]
-      # if is_verb(trn_verb_candidate): только для глаголов
+    for index in [i for i, x in enumerate(words_list) if x == fix_encoding_lower(inf_verb)]:
+      trn_verb_candidate = trn_words_list[index]
       if trn_verb != '':
         trn_verb = trn_verb + '; '
       trn_verb = trn_verb + trn_verb_candidate
@@ -391,230 +345,126 @@ def chv_deconjugate(verb, verb_filename, trn_verb_filename, conj_filename, pos, 
       chosen_form = forms[form_index]
   if trn_verb == '':
     trn_verb = 'нет в словаре'
-  if verbal:
-    if len(inf_verbs) == 0:
-      print(pos + ' не найден')
-    else:
-      print('%s: %s %s в форме %s\n%s' % (verb, pos, chosen_inv_verb, chosen_form[2:], trn_verb))  
-  # return '%s: глагол %s в форме %s\n%s' % (verb, chosen_inv_verb, chosen_form[2:], trn_verb)
-  return chosen_inv_verb, trn_verb
-  # return trn_verb != 'нет в словаре'
-  
-def chv_get_form_from_config(config_filename):
-  form_list = []
-  chislo_list = ['e', 'm']
-  lico_list = ['1', '2', '3']
-  negative_list = ['p', 'n']
-  verb_form_list = ['nb', 'po', 'bb', 'ps', 'pd', 'im', 'in', 'pn', 'pb', 'pm', 'de', 'du', 'dv']
-  with open(config_filename, encoding="utf-8") as config_file:
-    for line in config_file:
-      splitted_line = line.replace('\n','').split(':')
-      if splitted_line[0] == 'Часть_речи':
-        if 'v' not in splitted_line[1].split(','):
-          return form_list
-      if splitted_line[0] == 'Число':
-        chislo_list = splitted_line[1].split(',')
-      if splitted_line[0] == 'Лицо':
-        lico_list = splitted_line[1].split(',')
-      if splitted_line[0] == 'Отрицание':
-        negative_list = splitted_line[1].split(',')
-      if splitted_line[0] == 'Форма':
-        verb_form_list = splitted_line[1].split(',')
-  for chislo in chislo_list:
-    for lico in lico_list:
-      for negative in negative_list:
-        for verb_form in verb_form_list:
-          form_list.append(chislo + '_' + lico + '_' + negative + '_' + verb_form)
-  return form_list
-
-def chv_get_form_from_noun_config(config_filename):
-  form_list = []
-  chislo_list = ['e', 'm']
-  lico_list = ['0','1', '2', '3']
-  padezh_list = ['im', 'ro', 'da', 'me', 'is', 'tv', 'pc']
-  with open(config_filename, encoding="utf-8") as config_file:
-    for line in config_file:
-      splitted_line = line.replace('\n','').split(':')
-      if splitted_line[0] == 'Часть_речи':
-        if 'n' not in splitted_line[1].split(','):
-          return form_list
-      if splitted_line[0] == 'Число':
-        chislo_list = splitted_line[1].split(',')
-      if splitted_line[0] == 'Лицо':
-        lico_list = splitted_line[1].split(',')
-      if splitted_line[0] == 'Падеж':
-        padezh_list = splitted_line[1].split(',')
-  for chislo in chislo_list:
-    for lico in lico_list:
-      for padezh in padezh_list:
-        form_list.append(chislo + '_' + lico + '_' + padezh)
-  return form_list
-
-def chv_search_form(verb, verbs_list, trn_verbs_list, conj_table, form_list, verbal=True):
-  verb = check_encoding(verb, False)
-  verb = verb.lower()
-  trn_verb = ''
-  inf_verbs, forms = chv_apply_derules(verb, conj_table)
-  chosen_inv_verb = ''
-  chosen_form = ''
-  form_index = -1
-  form_found = False
-  for inf_verb in inf_verbs:
-    form_index = form_index + 1
-    for index in [i for i, x in enumerate(verbs_list) if x == check_encoding(inf_verb)]:
-      trn_verb_candidate = trn_verbs_list[index]
-      if is_verb(trn_verb_candidate):
-        if trn_verb != '':
-          trn_verb = trn_verb + '; '
-        trn_verb = trn_verb + trn_verb_candidate
-        chosen_inv_verb = inf_verb
-        chosen_form = forms[form_index]
-  if trn_verb == '':
-    trn_verb = 'нет в словаре'
-  if chosen_form[2:] in form_list:
+  if chosen_form[2:] in form_verb_list:
     if verbal:
-      print('%s: глагол %s в форме %s\n%s' % (verb, chosen_inv_verb, chosen_form[2:], trn_verb))
-    form_found = True
-  return form_found, chosen_form[2:]
-
-def chv_search_noun_form(noun, nouns_list, trn_nouns_list, noun_table, form_list, verbal=True):
-  noun = check_encoding(noun, False)
-  noun = noun.lower()
-  trn_noun = ''
-  im_nouns, forms = chv_apply_noun_derules(noun, noun_table, form_list)
-  chosen_im_noun = ''
-  chosen_form = ''
-  form_index = -1
-  form_found = False
-  for im_noun in im_nouns:
-    form_index = form_index + 1
-    for index in [i for i, x in enumerate(nouns_list) if x == check_encoding(im_noun)]:
-      trn_noun_candidate = trn_nouns_list[index]
-      #if is_verb(trn_verb_candidate):
-      if trn_noun != '':
-        trn_noun = trn_noun + '; '
-      trn_noun = trn_noun + trn_noun_candidate
-      chosen_im_noun = im_noun
-      chosen_form = forms[form_index]
-  if trn_noun == '':
-    trn_noun = 'нет в словаре'
-  if chosen_form[2:] in form_list:
-    if verbal:
-      print('%s: существительное %s в форме %s\n%s' % (noun, chosen_im_noun, chosen_form[2:], trn_noun))
+      print('%s: %s %s в форме %s\n%s' % (verb, pos_verbal, chosen_inv_verb, chosen_form[2:], trn_verb))
     form_found = True
   return form_found, chosen_form[2:]
   
-def chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, show_first_sents=10, config2_filename=None):
-  index_table = np.load(index_filename, allow_pickle='TRUE').item()
-  verb_index_filename = 'verb_' + index_filename
-  verb_index_table = np.load(verb_index_filename, allow_pickle='TRUE').item()
+def chv_search_form_in_list(form_list, config, total_sents, verb_index_table, pos, line, counter, counter_list):
+  translator = str.maketrans('', '', string.punctuation)
+  for form in form_list:
+    form_num = form + str(total_sents)
+    if form_num in verb_index_table.keys():
+      verb_list = verb_index_table[form_num]
+      for verb in verb_list:
+        verb_index = line[:-1].replace('-',' ').translate(translator).split(' ').index(verb)
+        if not counter:
+          if (config.has_second_word < 1) or (verb_index in counter_list[total_sents]):
+            chv_search_form(verb, pos, config, form_list, verbal=True)
+        else:
+          counter_list.append(verb_index)
+  
+def chv_search(config, show_first_sents=10):
+  index_table = np.load(config.index_filename, allow_pickle='TRUE').item()
+  verb_index_table = np.load(config.verb_index_filename, allow_pickle='TRUE').item()  
   sent_numbers = set()
   sent_numbers2 = set()
-  sent_numbers3 = set()
-  sent_numbers4 = set()
-  form_verb_list = chv_get_form_from_config(config_filename)
-  form_noun_list = chv_get_form_from_noun_config(config_filename)
-  conj_verb_table = chv_read_conj_table(conj_verb_filename, True)
-  conj_noun_table = chv_read_conj_table(conj_noun_filename, True)
-  verbs_list = chv_read_verbs_list(verb_filename)
-  trn_verbs_list = chv_read_verbs_list(trn_verb_filename)
-  nouns_list = chv_read_verbs_list(noun_filename)
-  trn_nouns_list = chv_read_verbs_list(trn_noun_filename)
-  form2_verb_list = []
-  form2_noun_list = []
+  
   print("первый список форм")
-  if len(form_verb_list)>0: print(form_verb_list)
-  if len(form_noun_list)>0: print(form_noun_list)
-  if config2_filename is not None:
-    form2_verb_list = chv_get_form_from_config(config2_filename)
-    form2_noun_list = chv_get_form_from_noun_config(config2_filename)
+  if len(config.form_verb_list) > 0: print(config.form_verb_list)
+  if len(config.form_noun_list) > 0: print(config.form_noun_list)
+  if config.has_second_word >= 1:
     print("второй список форм")
-    if len(form2_verb_list)>0: print(form2_verb_list)
-    if len(form2_noun_list)>0: print(form2_noun_list)
-  conj_verb_table = chv_read_conj_table(conj_verb_filename, True)
-  conj_noun_table = chv_read_conj_table(conj_noun_filename, True)
+    if len(config.form2_verb_list) > 0: print(config.form2_verb_list)
+    if len(config.form2_noun_list) > 0: print(config.form2_noun_list)
+    print("расстояние: %d" % config.has_second_word)
   total_sents = 0
-  for form in form_verb_list:
+  for form in config.form_verb_list + config.form2_verb_list:
     if form in index_table.keys():
       sent_numbers = sent_numbers.union(map(int, index_table[form]))
-  for form2 in form2_verb_list:
-    if form2 in index_table.keys():
-      sent_numbers2 = sent_numbers2.union(map(int, index_table[form2]))
-  for form in form_noun_list:
-    if form in index_table.keys():
-      sent_numbers = sent_numbers.union(map(int, index_table[form]))
-  for form2 in form2_noun_list:
-    if form2 in index_table.keys():
-      sent_numbers2 = sent_numbers2.union(map(int, index_table[form2]))
-  if config2_filename is not None:
+  if config.has_second_word >= 1:
+    for form2 in config.form2_verb_list + config.form2_noun_list:
+      if form2 in index_table.keys():
+        sent_numbers2 = sent_numbers2.union(map(int, index_table[form2]))
     sent_numbers = sent_numbers.intersection(sent_numbers2)
   sent_numbers = sorted(sent_numbers)
-  print("найдено предложений")
-  print(len(sent_numbers))
-  if (show_first_sents > 0):
-    print("показаны первые")    
-    sent_numbers = sent_numbers[:show_first_sents]
-    print(len(sent_numbers))
-  with open(search_filename, encoding="utf-8") as search_file:
+  with open(config.search_filename, encoding="utf-8") as search_file:
+    dist_sent_numbers = set()
+    dist_pair1 = {}
+    dist_pair2 = {}
+    if config.has_second_word >= 1:
+      for line in search_file:
+        total_sents += 1
+        line = fix_encoding_lower(line, False)
+        if total_sents in sent_numbers:
+          counter1_list = []
+          counter2_list = []
+          chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter1_list)
+          chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter1_list)
+          chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter2_list)
+          chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter2_list)
+          #print(counter1_list)
+          #print(counter2_list)
+          #print("\n")
+          
+          for cnt1 in counter1_list:
+            for cnt2 in counter2_list:
+              if (cnt2 > cnt1) and (cnt2 <= (cnt1 + config.has_second_word)):              
+                dist_sent_numbers.add(total_sents)
+                if total_sents in dist_pair1.keys():
+                  tmp = dist_pair1[total_sents]
+                  tmp.append(cnt1)
+                  dist_pair1[total_sents] = tmp
+                else:
+                  dist_pair1[total_sents] = [cnt1]
+                if total_sents in dist_pair2.keys():
+                  tmp = dist_pair2[total_sents]
+                  tmp.append(cnt2)
+                  dist_pair2[total_sents] = tmp
+                else:
+                  dist_pair2[total_sents] = [cnt2]
+    else:
+      dist_sent_numbers = sent_numbers
+    
+    dist_sent_numbers = sorted(dist_sent_numbers)    
+    print("найдено предложений: %d" % len(dist_sent_numbers))
+    if (show_first_sents > 0):  
+      dist_sent_numbers = dist_sent_numbers[:show_first_sents]
+      print("показаны первые: %d"  % len(dist_sent_numbers))
+    print("\n")
+  
+  with open(config.search_filename, encoding="utf-8") as search_file:  
+    total_sents = 0    
     for line in search_file:
       total_sents += 1
-      if total_sents in sent_numbers:
-        for form in form_verb_list:
-          form_num = form + str(total_sents)
-          if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num]
-            for verb in verb_list:
-              chv_search_form(verb, verbs_list, trn_verbs_list, conj_verb_table, form_verb_list, verbal=True)
-        for form in form_noun_list:
-          form_num = form + str(total_sents)
-          if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num]
-            for verb in verb_list:
-              chv_search_noun_form(verb, nouns_list, trn_nouns_list, conj_noun_table, form_noun_list, verbal=True)
-        for form2 in form2_verb_list:
-          form_num = form2 + str(total_sents)
-          if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num]
-            for verb in verb_list:
-              chv_search_form(verb, verbs_list, trn_verbs_list, conj_verb_table, form2_verb_list, verbal=True)
-        for form2 in form2_noun_list:
-          form_num = form2 + str(total_sents)
-          if form_num in verb_index_table.keys():
-            verb_list = verb_index_table[form_num]
-            for verb in verb_list:
-              chv_search_noun_form(verb, nouns_list, trn_nouns_list, conj_noun_table, form2_noun_list, verbal=True)
+      line = fix_encoding_lower(line, False)
+      if total_sents in dist_sent_numbers:
+        chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, False, dist_pair1)
+        chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, False, dist_pair1)
+        chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, False, dist_pair2)
+        chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, False, dist_pair2)
         print('%d:%s' % (total_sents, line))
   
-def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_dict, verb_index_dict, index_filename=None):
+def chv_create_search_index(config):
   found_sents = 0
   total_sents = 0
-  translator = str.maketrans('', '', string.punctuation)
-  form_found = False
-  word_form_found = False
-  new_line = ''
-  form_verb_list = chv_get_form_from_config(config_filename)
-  form_noun_list = chv_get_form_from_noun_config(config_filename)
-  conj_verb_table = chv_read_conj_table(conj_verb_filename, True)
-  conj_noun_table = chv_read_conj_table(conj_noun_filename, True)
-  verbs_list = chv_read_verbs_list(verb_filename)
-  trn_verbs_list = chv_read_verbs_list(trn_verb_filename)
-  nouns_list = chv_read_verbs_list(noun_filename)
-  trn_nouns_list = chv_read_verbs_list(trn_noun_filename)
+  translator = str.maketrans('', '', string.punctuation)  
   cash_dict = {}
-  for line in s_list:
+  index_dict = {}
+  verb_index_dict = {}
+  with open(config.search_filename, encoding="utf-8") as search_file:
+    for line in search_file:
       total_sents += 1
       form_found = False
       word_form_found = False
       noun_form_found = False
-      new_line = line[:-1].replace('-',' ')
-      words = new_line.translate(translator).split(' ')
+      line = fix_encoding_lower(line, False)
+      words = line[:-1].replace('-',' ').translate(translator).split(' ')
       for word in words:
-        word = check_encoding(word, False)
-        word = word.lower()
-        debug = word == "тухсан"
         if word not in cash_dict.keys():
-          word_form_found, chosen_verb_form = chv_search_form(word, verbs_list, trn_verbs_list, conj_verb_table, form_verb_list, False)
-          noun_form_found, chosen_noun_form = chv_search_noun_form(word, nouns_list, trn_nouns_list, conj_noun_table, form_noun_list, False)
+          word_form_found, chosen_verb_form = chv_search_form(word, "verb", config, config.form_verb_list)
+          noun_form_found, chosen_noun_form = chv_search_form(word, "noun", config, config.form_noun_list)
         else:
           word_form_found = True
           chosen_verb_form = cash_dict[word]
@@ -653,60 +503,20 @@ def chv_create_search_index(s_list, verb_filename, trn_verb_filename, noun_filen
             tmp.append(word)
             verb_index_dict[chosen_form_num] = tmp
           else:
-            verb_index_dict[chosen_form_num] =  [word]
+            verb_index_dict[chosen_form_num] = [word]
       if form_found:
         found_sents += 1
         print('%d из %d:%s' % (found_sents, total_sents, line))
+    np.save(config.index_filename, index_dict)
+    np.save(config.verb_index_filename, verb_index_dict)  
 
 if __name__ == '__main__':
-  start_time = time.time()
   show_first_sents = int(sys.argv[1])
   has_second_word = int(sys.argv[2])
+  is_index = False
+  config = Config(has_second_word, is_index)
   
-  conj_noun_filename = 'conj_noun_table.txt'
-  conj_verb_filename = 'conj_table.txt'
-  noun_filename = 'andreev.chv_noun'
-  trn_noun_filename = 'andreev.ru_noun'
-  verb_filename = 'andreev.chv_verb'
-  trn_verb_filename = 'andreev.ru_verb'
-  search_filename = 'chv.100K.monocorpus.txt'
-  prnn_filename = 'pronoun_table.txt'
-  config_filename = 'config.txt'
-  config2_filename = 'config2.txt'
-  if has_second_word != 1: config2_filename = None
-  index_filename = 'index.npy'
-    
-  with open(search_filename, encoding="utf-8") as search_file:
-    lines = search_file.read().splitlines()
-  n = len(lines) # 300
-  search_list = (lines[i:i+n] for i in range(0, len(lines), n))  
-  index_table_list = []
-  verb_index_table_list = []
-  procs = []
-  '''
-  manager = Manager()
-  mp_index_dict = manager.dict()
-  mp_verb_index_dict = manager.dict()
-  for index, s_list in enumerate(search_list):
-    index_table_list.append({})
-    verb_index_table_list.append({})
-    proc = Process(target=chv_create_search_index, args=(s_list, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, mp_index_dict, mp_verb_index_dict, index, n, index_filename,))
-    procs.append(proc)
-    proc.start()
-  for proc in procs:
-    proc.join()
-  
-  index_dict = mp_index_dict.copy()
-  verb_index_dict = mp_verb_index_dict.copy()
-  '''
-  '''
-  index_dict = {}
-  verb_index_dict = {}
-  chv_create_search_index(search_list, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_dict, verb_index_dict, index_filename)
-  np.save(index_filename, index_dict)
-  verb_index_filename = 'verb_' + index_filename
-  np.save(verb_index_filename, verb_index_dict)  
-  '''  
-  chv_search(search_filename, verb_filename, trn_verb_filename, noun_filename, trn_noun_filename, conj_verb_filename, conj_noun_filename, config_filename, index_filename, show_first_sents, config2_filename)
-  
-  print("--- %s seconds ---" % (time.time() - start_time))  
+  if is_index:
+    chv_create_search_index(config)
+  else:
+    chv_search(config, show_first_sents)
