@@ -131,6 +131,11 @@ def chv_apply_rules(verb, conj_table, form):
     if verb[-1] == 'с':
       conj_verb = verb[:-1] + affix
   return conj_verb
+  
+def chv_apply_noun_rules(verb, conj_table, form):
+  affix = conj_table[form]
+  conj_verb = verb + affix
+  return conj_verb
 
 def get_hs(verb):
   hard = ['а', 'ӑ', 'о', 'у', 'ы', 'ю', 'я']
@@ -307,16 +312,56 @@ def chv_apply_noun_derules(noun, noun_table, form_list = []):
         for j in range(len(forms),len(im_nouns)):
           forms.append(form)
   return im_nouns, forms
+
+def chv_get_wordforms_from_lemma(config): # from 'chv_conjugate'  
+  wordform_list = []
+  if config.is_lemma:
+    for lemma in config.wordform_list:
+      lemma = fix_encoding_lower(lemma)
+      hs = get_hs(lemma)
+      for form in config.conj_verb_normal_table.keys():
+        if form[0] != hs:
+          continue
+        wordform = chv_apply_rules(lemma, config.conj_verb_normal_table, form)
+        wordform_list.append(fix_encoding_lower(wordform, False))
+      for form in config.conj_noun_normal_table.keys():
+        if form[0] != hs:
+          continue
+        wordform = chv_apply_noun_rules(lemma, config.conj_noun_normal_table, form)
+        wordform_list.append(fix_encoding_lower(wordform, False))
+  else:
+    for wordform in config.wordform_list:
+      wordform_list.append(fix_encoding_lower(wordform, False))
+  
+  wordform2_list = []
+  if config.is_lemma2:
+    for lemma in config.wordform2_list:
+      lemma = fix_encoding_lower(lemma)
+      hs = get_hs(lemma)
+      for form in config.conj_verb_normal_table.keys():
+        if form[0] != hs:
+          continue
+        wordform = chv_apply_rules(lemma, config.conj_verb_normal_table, form)
+        wordform2_list.append(fix_encoding_lower(wordform, False))
+      for form in config.conj_noun_normal_table.keys():
+        if form[0] != hs:
+          continue
+        wordform = chv_apply_noun_rules(lemma, config.conj_noun_normal_table, form)
+        wordform2_list.append(fix_encoding_lower(wordform, False))
+  else:
+    for wordform2 in config.wordform2_list:
+      wordform2_list.append(fix_encoding_lower(wordform2, False))
+    
+  return list(set(wordform_list)), list(set(wordform2_list))
   
 def fix_encoding_lower(verb, reverse = True):
-  verb = verb.lower()
+  verb = verb.lower().strip()
   if reverse:
     return verb.replace('ӗ','ĕ').replace('ӑ','ă').replace('ҫ','ç').replace('ӳ','ÿ')
   else:
     return verb.replace('ĕ','ӗ').replace('ă','ӑ').replace('ç','ҫ').replace('ÿ','ӳ')
 
 def chv_search_form(verb, pos, config, form_verb_list, verbal=False):
-  debug = verb == "хӑмпӑ"
   if pos == "verb":
     conj_table = config.conj_verb_table
     words_list = config.verbs_list
@@ -330,7 +375,7 @@ def chv_search_form(verb, pos, config, form_verb_list, verbal=False):
     pos_verbal = "существительное"
     inf_words, forms = chv_apply_noun_derules(verb, conj_table, form_verb_list)
   trn_verb = ''
-  chosen_inv_verb = ''
+  chosen_inf_verb = ''
   chosen_form = ''
   form_index = -1
   form_found = False
@@ -341,15 +386,27 @@ def chv_search_form(verb, pos, config, form_verb_list, verbal=False):
       if trn_verb != '':
         trn_verb = trn_verb + '; '
       trn_verb = trn_verb + trn_verb_candidate
-      chosen_inv_verb = inf_verb
+      chosen_inf_verb = inf_verb
       chosen_form = forms[form_index]
   if trn_verb == '':
     trn_verb = 'нет в словаре'
   if chosen_form[2:] in form_verb_list:
     if verbal:
-      print('%s: %s %s в форме %s\n%s' % (verb, pos_verbal, chosen_inv_verb, chosen_form[2:], trn_verb))
+      print('%s: %s %s в форме %s\n%s' % (verb, pos_verbal, chosen_inf_verb, chosen_form[2:], trn_verb))
     form_found = True
-  return form_found, chosen_form[2:]
+  return form_found, chosen_form[2:], chosen_inf_verb
+  
+def chv_search_wordform(wordform_list, config, total_sents, vocab_table, counter, counter_list):
+  for wordform in wordform_list:
+    if wordform in vocab_table.keys():
+      for wf in vocab_table[wordform]:
+        if int(wf[0]) == total_sents:
+          wf1 = int(wf[1])
+          if counter:
+            counter_list.append(wf1)
+          else:
+            if (config.has_second_word < 1) or (wf1 in counter_list[total_sents]):
+              print('%s: словоформа' % wordform)
   
 def chv_search_form_in_list(form_list, config, total_sents, verb_index_table, pos, line, counter, counter_list):
   translator = str.maketrans('', '', string.punctuation)
@@ -359,37 +416,64 @@ def chv_search_form_in_list(form_list, config, total_sents, verb_index_table, po
       verb_list = verb_index_table[form_num]
       for verb in verb_list:
         verb_index = line[:-1].replace('-',' ').translate(translator).split(' ').index(verb)
-        if not counter:
+        if counter:
+          counter_list.append(verb_index)
+        else:
           if (config.has_second_word < 1) or (verb_index in counter_list[total_sents]):
             chv_search_form(verb, pos, config, form_list, verbal=True)
-        else:
-          counter_list.append(verb_index)
   
 def chv_search(config, show_first_sents=10):
   index_table = np.load(config.index_filename, allow_pickle='TRUE').item()
-  verb_index_table = np.load(config.verb_index_filename, allow_pickle='TRUE').item()  
+  verb_index_table = np.load(config.verb_index_filename, allow_pickle='TRUE').item()
+  vocab_table = np.load(config.vocab_filename, allow_pickle='TRUE').item()
   sent_numbers = set()
   sent_numbers2 = set()
-  
-  print("первый список форм")
-  if len(config.form_verb_list) > 0: print(config.form_verb_list)
-  if len(config.form_noun_list) > 0: print(config.form_noun_list)
-  if config.has_second_word >= 1:
+  word_sent_numbers = set()
+  word_sent_numbers2 = set()
+  translator = str.maketrans('', '', string.punctuation)
+  wordform_list, wordform2_list = chv_get_wordforms_from_lemma(config)
+    
+  if len(config.form_verb_list + config.form_noun_list) > 0:
+    print("первый список форм")
+    if len(config.form_verb_list) > 0: print(config.form_verb_list)
+    if len(config.form_noun_list) > 0: print(config.form_noun_list)
+  if len(config.form2_verb_list + config.form2_noun_list) > 0:
     print("второй список форм")
     if len(config.form2_verb_list) > 0: print(config.form2_verb_list)
     if len(config.form2_noun_list) > 0: print(config.form2_noun_list)
-    print("расстояние: %d" % config.has_second_word)
-  total_sents = 0
-  for form in config.form_verb_list + config.form2_verb_list:
+  for form in config.form_verb_list + config.form_noun_list:
     if form in index_table.keys():
-      sent_numbers = sent_numbers.union(map(int, index_table[form]))
+      sent_numbers = sent_numbers.union(map(int, [row[0] for row in index_table[form]]))
+  if len(wordform_list) > 0:
+    print("первый список форм")
+    print(wordform_list)
+    for wordform in wordform_list:
+      if wordform in vocab_table.keys():
+        word_sent_numbers = word_sent_numbers.union(map(int, [row[0] for row in vocab_table[wordform]]))
+    if len(config.form_verb_list + config.form_noun_list) > 0:
+      sent_numbers = sent_numbers.intersection(word_sent_numbers)
+    else:
+      sent_numbers = word_sent_numbers
   if config.has_second_word >= 1:
     for form2 in config.form2_verb_list + config.form2_noun_list:
       if form2 in index_table.keys():
-        sent_numbers2 = sent_numbers2.union(map(int, index_table[form2]))
+        sent_numbers2 = sent_numbers2.union(map(int, [row[0] for row in index_table[form2]]))
+    if len(wordform2_list) > 0:
+      print("второй список форм")
+      print(wordform2_list)
+      for wordform2 in wordform2_list:
+        if wordform2 in vocab_table.keys():
+          word_sent_numbers2 = word_sent_numbers2.union(map(int, [row[0] for row in vocab_table[wordform2]]))
+      if len(config.form2_verb_list + config.form2_noun_list) > 0:
+        sent_numbers2 = sent_numbers2.intersection(word_sent_numbers2)
+      else:
+        sent_numbers2 = word_sent_numbers2    
+    print("расстояние: %d" % config.has_second_word)
     sent_numbers = sent_numbers.intersection(sent_numbers2)
   sent_numbers = sorted(sent_numbers)
+  
   with open(config.search_filename, encoding="utf-8") as search_file:
+    total_sents = 0
     dist_sent_numbers = set()
     dist_pair1 = {}
     dist_pair2 = {}
@@ -402,11 +486,14 @@ def chv_search(config, show_first_sents=10):
           counter2_list = []
           chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter1_list)
           chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter1_list)
+          chv_search_wordform(wordform_list, config, total_sents, vocab_table, True, counter1_list)
           chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter2_list)
           chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter2_list)
-          #print(counter1_list)
-          #print(counter2_list)
-          #print("\n")
+          chv_search_wordform(wordform2_list, config, total_sents, vocab_table, True, counter2_list)
+          if (total_sents == 2):
+            print(counter1_list)
+            print(counter2_list)
+            print("\n")
           
           for cnt1 in counter1_list:
             for cnt2 in counter2_list:
@@ -440,16 +527,21 @@ def chv_search(config, show_first_sents=10):
       total_sents += 1
       line = fix_encoding_lower(line, False)
       if total_sents in dist_sent_numbers:
+        #print(dist_pair1)
+        #print(dist_pair2)
         chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, False, dist_pair1)
         chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, False, dist_pair1)
+        chv_search_wordform(wordform_list, config, total_sents, vocab_table, False, dist_pair1)
         chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, False, dist_pair2)
         chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, False, dist_pair2)
-        print('%d:%s' % (total_sents, line))
+        chv_search_wordform(wordform2_list, config, total_sents, vocab_table, False, dist_pair2)
+        print('%d:%s\n' % (total_sents, line))
   
 def chv_create_search_index(config):
   found_sents = 0
   total_sents = 0
-  translator = str.maketrans('', '', string.punctuation)  
+  translator = str.maketrans('', '', string.punctuation)
+  vocab = {}
   cash_dict = {}
   index_dict = {}
   verb_index_dict = {}
@@ -461,25 +553,35 @@ def chv_create_search_index(config):
       noun_form_found = False
       line = fix_encoding_lower(line, False)
       words = line[:-1].replace('-',' ').translate(translator).split(' ')
+      word_ind = 0
       for word in words:
         if word not in cash_dict.keys():
-          word_form_found, chosen_verb_form = chv_search_form(word, "verb", config, config.form_verb_list)
-          noun_form_found, chosen_noun_form = chv_search_form(word, "noun", config, config.form_noun_list)
+          word_form_found, chosen_verb_form, chosen_inf_verb = chv_search_form(word, "verb", config, config.form_verb_list)
+          noun_form_found, chosen_noun_form, chosen_inf_noun = chv_search_form(word, "noun", config, config.form_noun_list)
+          vocab[word] = [[str(total_sents), str(word_ind)]]
         else:
           word_form_found = True
-          chosen_verb_form = cash_dict[word]
+          chosen_verb_form = cash_dict[word][0]
+          chosen_noun_form = ''
+          tmp = vocab[word]
+          tmp.append([str(total_sents), str(word_ind)])
+          vocab[word] = tmp
         if word_form_found or noun_form_found:
           form_found = True
+        if chosen_verb_form == '' and chosen_noun_form == '':
+          if word not in cash_dict.keys():
+            cash_dict[word] = ['', '']          
         if chosen_verb_form != '':
           chosen_form = chosen_verb_form
+          chosen_inf = chosen_inf_verb
           if word not in cash_dict.keys():
-            cash_dict[word] = chosen_form
+            cash_dict[word] = [chosen_form, chosen_inf]
           if chosen_form in index_dict.keys():
             tmp = index_dict[chosen_form]
-            tmp.append(str(total_sents))
+            tmp.append([str(total_sents), str(word_ind)])
             index_dict[chosen_form] = tmp
           else:
-            index_dict[chosen_form] = [str(total_sents)]
+            index_dict[chosen_form] = [[str(total_sents), str(word_ind)]]
           chosen_form_num = chosen_form + str(total_sents)
           if chosen_form_num in verb_index_dict.keys():
             tmp = verb_index_dict[chosen_form_num]
@@ -489,14 +591,15 @@ def chv_create_search_index(config):
             verb_index_dict[chosen_form_num] = [word]
         if chosen_noun_form != '':
           chosen_form = chosen_noun_form
+          chosen_inf = chosen_inf_noun
           if word not in cash_dict.keys():
-            cash_dict[word] = chosen_form
+            cash_dict[word] = [chosen_form, chosen_inf]
           if chosen_form in index_dict.keys():
             tmp = index_dict[chosen_form]
-            tmp.append(str(total_sents))
+            tmp.append([str(total_sents), str(word_ind)])
             index_dict[chosen_form] = tmp
           else:
-            index_dict[chosen_form] = [str(total_sents)]
+            index_dict[chosen_form] = [[str(total_sents), str(word_ind)]]
           chosen_form_num = chosen_form + str(total_sents)
           if chosen_form_num in verb_index_dict.keys():
             tmp = verb_index_dict[chosen_form_num]
@@ -504,11 +607,14 @@ def chv_create_search_index(config):
             verb_index_dict[chosen_form_num] = tmp
           else:
             verb_index_dict[chosen_form_num] = [word]
+        word_ind += 1
       if form_found:
         found_sents += 1
         print('%d из %d:%s' % (found_sents, total_sents, line))
     np.save(config.index_filename, index_dict)
-    np.save(config.verb_index_filename, verb_index_dict)  
+    np.save(config.verb_index_filename, verb_index_dict)
+    np.save(config.cash_filename, cash_dict)
+    np.save(config.vocab_filename, vocab)
 
 if __name__ == '__main__':
   show_first_sents = int(sys.argv[1])
