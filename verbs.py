@@ -313,46 +313,41 @@ def chv_apply_noun_derules(noun, noun_table, form_list = []):
           forms.append(form)
   return im_nouns, forms
 
-def chv_get_wordforms_from_lemma(config): # from 'chv_conjugate'  
+def chv_get_wordforms_from_lemma(config, form_list, config_wordform_list, config_is_lemma, vocab_table): # from 'chv_conjugate'  
   wordform_list = []
-  if config.is_lemma:
-    for lemma in config.wordform_list:
+  if config_is_lemma:
+    for lemma in config_wordform_list:
       lemma = fix_encoding_lower(lemma)
       hs = get_hs(lemma)
       for form in config.conj_verb_normal_table.keys():
         if form[0] != hs:
+          continue
+        if form[2:] not in form_list:
           continue
         wordform = chv_apply_rules(lemma, config.conj_verb_normal_table, form)
         wordform_list.append(fix_encoding_lower(wordform, False))
       for form in config.conj_noun_normal_table.keys():
         if form[0] != hs:
           continue
+        if form[2:] not in form_list:
+          continue
         wordform = chv_apply_noun_rules(lemma, config.conj_noun_normal_table, form)
         wordform_list.append(fix_encoding_lower(wordform, False))
   else:
-    for wordform in config.wordform_list:
-      wordform_list.append(fix_encoding_lower(wordform, False))
-  
-  wordform2_list = []
-  if config.is_lemma2:
-    for lemma in config.wordform2_list:
-      lemma = fix_encoding_lower(lemma)
-      hs = get_hs(lemma)
-      for form in config.conj_verb_normal_table.keys():
-        if form[0] != hs:
-          continue
-        wordform = chv_apply_rules(lemma, config.conj_verb_normal_table, form)
-        wordform2_list.append(fix_encoding_lower(wordform, False))
-      for form in config.conj_noun_normal_table.keys():
-        if form[0] != hs:
-          continue
-        wordform = chv_apply_noun_rules(lemma, config.conj_noun_normal_table, form)
-        wordform2_list.append(fix_encoding_lower(wordform, False))
-  else:
-    for wordform2 in config.wordform2_list:
-      wordform2_list.append(fix_encoding_lower(wordform2, False))
-    
-  return list(set(wordform_list)), list(set(wordform2_list))
+    for wordform in config_wordform_list:
+      fixed_wordform = fix_encoding_lower(wordform, False)
+      if '*' in fixed_wordform:
+        wordform_vocab_list = []
+        if fixed_wordform[-1] == '*':
+          wordform_vocab_list = [d for d in vocab_table.keys() if d.startswith(fixed_wordform[:-1])]
+        if fixed_wordform[0] == '*':
+          wordform_vocab_list = [d for d in vocab_table.keys() if d.endswith(fixed_wordform[1:])]
+        for wordform_vocab in wordform_vocab_list:
+          wordform_list.append(fix_encoding_lower(wordform_vocab, False))
+      else:
+        wordform_list.append(fixed_wordform)
+      
+  return list(set(wordform_list))
   
 def fix_encoding_lower(verb, reverse = True):
   verb = verb.lower().strip()
@@ -431,13 +426,14 @@ def chv_search(config, show_first_sents=10):
   word_sent_numbers = set()
   word_sent_numbers2 = set()
   translator = str.maketrans('', '', string.punctuation)
-  wordform_list, wordform2_list = chv_get_wordforms_from_lemma(config)
+  wordform_list = chv_get_wordforms_from_lemma(config, config.form_verb_list + config.form_noun_list, config.wordform_list, config.is_lemma, vocab_table)
+  wordform2_list = chv_get_wordforms_from_lemma(config, config.form2_verb_list + config.form2_noun_list, config.wordform2_list, config.is_lemma, vocab_table)
     
-  if len(config.form_verb_list + config.form_noun_list) > 0:
+  if len(config.form_verb_list + config.form_noun_list) > 0 and len(wordform_list) == 0:
     print("первый список форм")
     if len(config.form_verb_list) > 0: print(config.form_verb_list)
     if len(config.form_noun_list) > 0: print(config.form_noun_list)
-  if len(config.form2_verb_list + config.form2_noun_list) > 0:
+  if len(config.form2_verb_list + config.form2_noun_list) > 0 and len(wordform2_list) == 0:
     print("второй список форм")
     if len(config.form2_verb_list) > 0: print(config.form2_verb_list)
     if len(config.form2_noun_list) > 0: print(config.form2_noun_list)
@@ -450,7 +446,7 @@ def chv_search(config, show_first_sents=10):
     for wordform in wordform_list:
       if wordform in vocab_table.keys():
         word_sent_numbers = word_sent_numbers.union(map(int, [row[0] for row in vocab_table[wordform]]))
-    if len(config.form_verb_list + config.form_noun_list) > 0:
+    if len(config.form_verb_list + config.form_noun_list) > 0 and len(wordform_list) == 0:
       sent_numbers = sent_numbers.intersection(word_sent_numbers)
     else:
       sent_numbers = word_sent_numbers
@@ -464,7 +460,7 @@ def chv_search(config, show_first_sents=10):
       for wordform2 in wordform2_list:
         if wordform2 in vocab_table.keys():
           word_sent_numbers2 = word_sent_numbers2.union(map(int, [row[0] for row in vocab_table[wordform2]]))
-      if len(config.form2_verb_list + config.form2_noun_list) > 0:
+      if len(config.form2_verb_list + config.form2_noun_list) > 0 and len(wordform2_list) == 0:
         sent_numbers2 = sent_numbers2.intersection(word_sent_numbers2)
       else:
         sent_numbers2 = word_sent_numbers2    
@@ -484,12 +480,16 @@ def chv_search(config, show_first_sents=10):
         if total_sents in sent_numbers:
           counter1_list = []
           counter2_list = []
-          chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter1_list)
-          chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter1_list)
-          chv_search_wordform(wordform_list, config, total_sents, vocab_table, True, counter1_list)
-          chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter2_list)
-          chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter2_list)
-          chv_search_wordform(wordform2_list, config, total_sents, vocab_table, True, counter2_list)
+          if len(config.form_verb_list + config.form_noun_list) > 0 and len(wordform_list) == 0:
+            chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter1_list)
+            chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter1_list)
+          if len(wordform_list) > 0:
+            chv_search_wordform(wordform_list, config, total_sents, vocab_table, True, counter1_list)
+          if len(config.form2_verb_list + config.form2_noun_list) > 0 and len(wordform2_list) == 0:
+            chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, True, counter2_list)
+            chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, True, counter2_list)
+          if len(wordform2_list) > 0:
+            chv_search_wordform(wordform2_list, config, total_sents, vocab_table, True, counter2_list)
           if (total_sents == 2):
             print(counter1_list)
             print(counter2_list)
@@ -525,17 +525,20 @@ def chv_search(config, show_first_sents=10):
     total_sents = 0    
     for line in search_file:
       total_sents += 1
-      line = fix_encoding_lower(line, False)
+      line_norm = fix_encoding_lower(line, False)
       if total_sents in dist_sent_numbers:
-        #print(dist_pair1)
-        #print(dist_pair2)
-        chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line, False, dist_pair1)
-        chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line, False, dist_pair1)
-        chv_search_wordform(wordform_list, config, total_sents, vocab_table, False, dist_pair1)
-        chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line, False, dist_pair2)
-        chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line, False, dist_pair2)
-        chv_search_wordform(wordform2_list, config, total_sents, vocab_table, False, dist_pair2)
-        print('%d:%s\n' % (total_sents, line))
+        if len(config.form_verb_list + config.form_noun_list) > 0 and len(wordform_list) == 0:
+          chv_search_form_in_list(config.form_verb_list, config, total_sents, verb_index_table, "verb", line_norm, False, dist_pair1)
+          chv_search_form_in_list(config.form_noun_list, config, total_sents, verb_index_table, "noun", line_norm, False, dist_pair1)
+        if len(wordform_list) > 0:
+          chv_search_wordform(wordform_list, config, total_sents, vocab_table, False, dist_pair1)
+        if config.has_second_word >= 1:
+          if len(config.form2_verb_list + config.form2_noun_list) > 0 and len(wordform2_list) == 0:
+            chv_search_form_in_list(config.form2_verb_list, config, total_sents, verb_index_table, "verb", line_norm, False, dist_pair2)
+            chv_search_form_in_list(config.form2_noun_list, config, total_sents, verb_index_table, "noun", line_norm, False, dist_pair2)
+          if len(wordform2_list) > 0:
+            chv_search_wordform(wordform2_list, config, total_sents, vocab_table, False, dist_pair2)
+        print('%d:%s' % (total_sents, line))
   
 def chv_create_search_index(config):
   found_sents = 0
@@ -626,3 +629,9 @@ if __name__ == '__main__':
     chv_create_search_index(config)
   else:
     chv_search(config, show_first_sents)
+    
+  #дописать поиск словоформа + форма: лартмалла,лартмалла [Done]
+  #дописать поиск по части словоформы: тутл* или *лă [Done]
+  #дописать правило: n+3+me хулинче
+  #добавить лă\лĕ
+  #Добавить наречие -ӑн/-ӗн/-н типа сиввӗн

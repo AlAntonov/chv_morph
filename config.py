@@ -48,7 +48,6 @@ class Config:
       lico_list = ['1', '2', '3']
       negative_list = ['p', 'n']
       verb_form_list = ['nb', 'po', 'bb', 'ps', 'pd', 'im', 'in', 'pn', 'pb', 'pm', 'de', 'du', 'dv']
-      form_in_config = False
       with open(config_filename, encoding="utf-8") as config_file:
         for line in config_file:
           splitted_line = line.replace('\n','').split(':')
@@ -57,22 +56,17 @@ class Config:
               return form_list
           if splitted_line[0] == 'Число':
             chislo_list = splitted_line[1].split(',')
-            form_in_config = True
           if splitted_line[0] == 'Лицо':
             lico_list = splitted_line[1].split(',')
-            form_in_config = True
           if splitted_line[0] == 'Отрицание':
             negative_list = splitted_line[1].split(',')
-            form_in_config = True
           if splitted_line[0] == 'Форма':
             verb_form_list = splitted_line[1].split(',')
-            form_in_config = True
-      if form_in_config:
-        for chislo in chislo_list:
-          for lico in lico_list:
-            for negative in negative_list:
-              for verb_form in verb_form_list:
-                form_list.append(chislo.strip() + '_' + lico.strip() + '_' + negative.strip() + '_' + verb_form.strip())
+      for chislo in chislo_list:
+        for lico in lico_list:
+          for negative in negative_list:
+            for verb_form in verb_form_list:
+              form_list.append(chislo.strip() + '_' + lico.strip() + '_' + negative.strip() + '_' + verb_form.strip())
       return form_list
 
     def chv_get_form_from_noun_config(config_filename):
@@ -80,7 +74,6 @@ class Config:
       chislo_list = ['e', 'm']
       lico_list = ['0','1', '2', '3']
       padezh_list = ['im', 'ro', 'da', 'me', 'is', 'tv', 'pc']
-      form_in_config = False
       with open(config_filename, encoding="utf-8") as config_file:
         for line in config_file:
           splitted_line = line.replace('\n','').split(':')
@@ -89,18 +82,14 @@ class Config:
               return form_list
           if splitted_line[0] == 'Число':
             chislo_list = splitted_line[1].split(',')
-            form_in_config = True
           if splitted_line[0] == 'Лицо':
             lico_list = splitted_line[1].split(',')
-            form_in_config = True
           if splitted_line[0] == 'Падеж':
             padezh_list = splitted_line[1].split(',')
-            form_in_config = True
-      if form_in_config:
-        for chislo in chislo_list:
-          for lico in lico_list:
-            for padezh in padezh_list:
-              form_list.append(chislo.strip() + '_' + lico.strip() + '_' + padezh.strip())
+      for chislo in chislo_list:
+        for lico in lico_list:
+          for padezh in padezh_list:
+            form_list.append(chislo.strip() + '_' + lico.strip() + '_' + padezh.strip())
       return form_list
     
     def chv_get_wordform_from_config(config_filename):
