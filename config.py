@@ -73,7 +73,7 @@ class Config:
       form_list = []
       chislo_list = ['e', 'm']
       lico_list = ['0','1', '2', '3']
-      padezh_list = ['im', 'ro', 'da', 'me', 'is', 'tv', 'pc']
+      padezh_list = ['im', 'ro', 'da', 'me', 'is', 'tv', 'li', 'pc']
       with open(config_filename, encoding="utf-8") as config_file:
         for line in config_file:
           splitted_line = line.replace('\n','').split(':')

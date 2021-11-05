@@ -131,10 +131,19 @@ def chv_apply_rules(verb, conj_table, form):
     if verb[-1] == 'с':
       conj_verb = verb[:-1] + affix
   return conj_verb
+
+def chv_apply_noun_last_vokal_rule(verb, affix, conj_verb):
+  # у существительных оканчивающюхся на 'а', в 3-м лице вместо 'ӗ' ставится 'и'
+  if verb[-1] in ['а']:
+    return verb[:-1] + 'и'
+  return conj_verb
   
 def chv_apply_noun_rules(verb, conj_table, form):
   affix = conj_table[form]
   conj_verb = verb + affix
+  #для 3-го лица
+  if form[4] == '3':
+    conj_verb = chv_apply_noun_last_vokal_rule(verb, affix, conj_verb)
   return conj_verb
 
 def get_hs(verb):
@@ -296,6 +305,13 @@ def chv_apply_derules(verb, conj_table):
         forms.append(form)
   return inf_verbs, forms
   
+def chv_apply_noun_last_vokal_derule(verb, i, inf_verbs):
+  # у существительных оканчивающюхся на 'а', в 3-м лице вместо 'ӗ' ставится 'и'
+  if verb[i:] in ['и', 'ин', 'ине', 'инче', 'инчен', 'ипе', 'исӗр', 'ишӗн']:
+    inf_verbs.append(verb[:i] + 'а')
+    return True
+  return False
+  
 def chv_apply_noun_derules(noun, noun_table, form_list = []):
   im_nouns = []
   forms = [] # 'форма не найдена'
@@ -305,10 +321,15 @@ def chv_apply_noun_derules(noun, noun_table, form_list = []):
     im_nouns.append(noun)
     forms.append("h_e_0_im")
   for i in range(-7,0):
-    if noun[i:] in noun_table:
+    if noun[i:] in noun_table:      
+      skip = False
       form = noun_table[noun[i:]]
+      # для 3-го лица
+      if form[4] == '3':
+        skip = chv_apply_noun_last_vokal_derule(noun, i, im_nouns)
       if form[2:] in form_list:
-        im_nouns.append(noun[:i])
+        if not skip:
+          im_nouns.append(noun[:i])
         for j in range(len(forms),len(im_nouns)):
           forms.append(form)
   return im_nouns, forms
@@ -410,7 +431,7 @@ def chv_search_form_in_list(form_list, config, total_sents, verb_index_table, po
     if form_num in verb_index_table.keys():
       verb_list = verb_index_table[form_num]
       for verb in verb_list:
-        verb_index = line[:-1].replace('-',' ').translate(translator).split(' ').index(verb)
+        verb_index = line.replace('-',' ').translate(translator).split(' ').index(verb)
         if counter:
           counter_list.append(verb_index)
         else:
@@ -555,7 +576,7 @@ def chv_create_search_index(config):
       word_form_found = False
       noun_form_found = False
       line = fix_encoding_lower(line, False)
-      words = line[:-1].replace('-',' ').translate(translator).split(' ')
+      words = line.replace('-',' ').translate(translator).split(' ')
       word_ind = 0
       for word in words:
         if word not in cash_dict.keys():
@@ -630,8 +651,7 @@ if __name__ == '__main__':
   else:
     chv_search(config, show_first_sents)
     
-  #дописать поиск словоформа + форма: лартмалла,лартмалла [Done]
-  #дописать поиск по части словоформы: тутл* или *лă [Done]
-  #дописать правило: n+3+me хулинче
+  #дописать правило: n+3+me хулинче [Done]
   #добавить лă\лĕ
   #Добавить наречие -ӑн/-ӗн/-н типа сиввӗн
+  #Лемма с гласной в конце хула или хул?
