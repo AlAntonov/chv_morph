@@ -1,0 +1,6 @@
+h_im:
+h_na:ӑн
+h_na:н
+s_im:
+h_na:ӗн
+h_na:н

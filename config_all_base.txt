@@ -1,5 +1,5 @@
-Часть_речи:v,n
+Часть_речи:v,n,aj
 Число:e,m
 Лицо:0,1,2,3
 Отрицание:p,n
-Форма:nb,po,bb,ps,pd,im,in,pn,pb,pm,de,du,dv,im,ro,da,me,is,tv,li,pc
+Форма:nb,po,bb,ps,pd,im,in,pn,pb,pm,de,du,dv,im,ro,da,me,is,tv,li,pc,pr,im,na
