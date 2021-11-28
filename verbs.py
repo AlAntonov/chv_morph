@@ -146,9 +146,16 @@ def chv_apply_noun_rules(word, conj_table, form):
     conj_word = chv_apply_noun_last_vokal_rule(word, affix, conj_word)
   return conj_word
   
+def chv_apply_adj_rules(word, conj_table, form):
+  affix = conj_table[form]
+  conj_word = word + affix
+  return conj_word
+  
 def chv_apply_rules(word, conj_table, form, pos):
   if pos == "noun":
     return chv_apply_noun_rules(word, conj_table, form)
+  elif pos == "adj":    
+    return chv_apply_adj_rules(word, conj_table, form)
   else:
     return chv_apply_verb_rules(word, conj_table, form)
 
@@ -391,7 +398,7 @@ def chv_get_wordforms_from_lemma(config, form_list, config_wordform_list, config
             continue
           if form[2:] not in form_list:
             continue
-          wordform = chv_apply_rules(lemma, config.conj_normal_table[pos], form)
+          wordform = chv_apply_rules(lemma, config.conj_normal_table[pos], form, pos)
           wordform_list.append(fix_encoding_lower(wordform, False))
   else:
     for wordform in config_wordform_list:
