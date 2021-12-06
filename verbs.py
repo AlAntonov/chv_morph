@@ -159,16 +159,6 @@ def chv_apply_rules(word, conj_table, form, pos):
   else:
     return chv_apply_verb_rules(word, conj_table, form)
 
-def get_hs(word):
-  hard = ['а', 'ӑ', 'о', 'у', 'ы', 'ю', 'я']
-  soft = ['е', 'ӗ', 'ӳ', 'и']
-  for a in reversed(word):
-    if a in hard:
-      return 'h'
-    if a in soft:
-      return 's'
-  return 'n'
-
 def chv_apply_10_derule(word, i, inf_verbs):
   # у десяти глаголов на –р (йӗр, кӗр, кӳр, пар, пер, пыр, хур, шӑр, яр конечный звук выпадает
   if word[:i] in ['йӗ', 'кӗ', 'кӳ', 'па', 'пе', 'пы', 'тӑ', 'ху', 'шӑ', 'я']:
@@ -423,6 +413,24 @@ def fix_encoding_lower(word, reverse = True):
   else:
     return word.replace('ĕ','ӗ').replace('ă','ӑ').replace('ç','ҫ').replace('ÿ','ӳ')
 
+def get_hs(word):
+  hard = ['а', 'ӑ', 'о', 'у', 'ы', 'ю', 'я']
+  soft = ['е', 'ӗ', 'ӳ', 'и']
+  for a in reversed(word):
+    if a in hard:
+      return 'h'
+    if a in soft:
+      return 's'
+  return 'n'
+
+def dict_append(dict, key, value):   
+  if key in dict.keys():
+    tmp = dict[key]
+    tmp.append(value)
+    dict[key] = tmp
+  else:
+    dict[key] = [value]
+
 def chv_search_form(word, pos, config, form_list, verbal=False):
   conj_table = config.conj_table[pos]
   words_list = config.src_list[pos]
@@ -462,20 +470,20 @@ def chv_search_wordform(wordform_list, config, total_sents, vocab_table, counter
           else:
             if (config.has_second_word < 1) or (wf1 in counter_list[total_sents]):
               print('%s: словоформа' % wordform)
-  
-def chv_search_form_in_list(form_list, config, total_sents, word_index_table, pos, line, counter, counter_list):
-  translator = str.maketrans('', '', string.punctuation)
+
+def chv_search_form_in_list(form_list, config, total_sents, word_index_table, pos, line, counter_list, translator):
   for form in form_list:
-    form_num = form + str(total_sents)
-    if form_num in word_index_table.keys():
-      word_list = word_index_table[form_num]
-      for word in word_list:
-        word_index = line.replace('-',' ').translate(translator).split(' ').index(word)
-        if counter:
-          counter_list.append(word_index)
-        else:
-          if (config.has_second_word < 1) or (word_index in counter_list[total_sents]):
-            chv_search_form(word, pos, config, form_list, verbal=True)
+    if form in word_index_table.keys() and total_sents in word_index_table[form].keys():
+      for word_index in word_index_table[form][total_sents]:
+        if (config.has_second_word < 1) or (word_index in counter_list[total_sents]):
+          words = line.replace('-',' ').translate(translator).split(' ')
+          chv_search_form(words[word_index], pos, config, form_list, verbal=True)
+
+def chv_search_pair(form_list, total_sents, word_index_table, counter_list):
+  for form in form_list:
+    if form in word_index_table.keys() and total_sents in word_index_table[form].keys():
+      for word_index in word_index_table[form][total_sents]:
+        counter_list.append(word_index)
   
 def chv_search(config, show_first_sents=10):
   index_table = np.load(config.index_filename, allow_pickle='TRUE').item()
@@ -528,7 +536,6 @@ def chv_search(config, show_first_sents=10):
         sent_numbers2 = word_sent_numbers2    
     print("расстояние: %d" % config.has_second_word)
     sent_numbers = sent_numbers.intersection(sent_numbers2)
-  sent_numbers = sorted(sent_numbers)
   
   with open(config.search_filename, encoding="utf-8") as search_file:
     total_sents = 0
@@ -544,12 +551,12 @@ def chv_search(config, show_first_sents=10):
           counter2_list = []
           if len(all_form_list) > 0 and len(wordform_list) == 0:
             for pos in config.pos_list:
-              chv_search_form_in_list(config.form_list[pos], config, total_sents, word_index_table, pos, line, True, counter1_list)
+              chv_search_pair(config.form_list[pos], total_sents, word_index_table, counter1_list)
           if len(wordform_list) > 0:
             chv_search_wordform(wordform_list, config, total_sents, vocab_table, True, counter1_list)
           if len(all_form2_list) > 0 and len(wordform2_list) == 0:
             for pos in config.pos_list:
-              chv_search_form_in_list(config.form2_list[pos], config, total_sents, word_index_table, pos, line, True, counter2_list)
+              chv_search_pair(config.form2_list[pos], total_sents, word_index_table, counter2_list)
           if len(wordform2_list) > 0:
             chv_search_wordform(wordform2_list, config, total_sents, vocab_table, True, counter2_list)
           #if (total_sents == 2):
@@ -561,18 +568,8 @@ def chv_search(config, show_first_sents=10):
             for cnt2 in counter2_list:
               if (cnt2 > cnt1) and (cnt2 <= (cnt1 + config.has_second_word)):              
                 dist_sent_numbers.add(total_sents)
-                if total_sents in dist_pair1.keys():
-                  tmp = dist_pair1[total_sents]
-                  tmp.append(cnt1)
-                  dist_pair1[total_sents] = tmp
-                else:
-                  dist_pair1[total_sents] = [cnt1]
-                if total_sents in dist_pair2.keys():
-                  tmp = dist_pair2[total_sents]
-                  tmp.append(cnt2)
-                  dist_pair2[total_sents] = tmp
-                else:
-                  dist_pair2[total_sents] = [cnt2]
+                dict_append(dist_pair1, total_sents, cnt1)
+                dict_append(dist_pair2, total_sents, cnt2)
     else:
       dist_sent_numbers = sent_numbers
     
@@ -591,13 +588,13 @@ def chv_search(config, show_first_sents=10):
       if total_sents in dist_sent_numbers:
         if len(all_form_list) > 0 and len(wordform_list) == 0:
           for pos in config.pos_list:
-            chv_search_form_in_list(config.form_list[pos], config, total_sents, word_index_table, pos, line_norm, False, dist_pair1)
+            chv_search_form_in_list(config.form_list[pos], config, total_sents, word_index_table, pos, line_norm, dist_pair1, translator)
         if len(wordform_list) > 0:
           chv_search_wordform(wordform_list, config, total_sents, vocab_table, False, dist_pair1)
         if config.has_second_word >= 1:
           if len(all_form2_list) > 0 and len(wordform2_list) == 0:
             for pos in config.pos_list:
-              chv_search_form_in_list(config.form2_list[pos], config, total_sents, word_index_table, pos, line_norm, False, dist_pair2)
+              chv_search_form_in_list(config.form2_list[pos], config, total_sents, word_index_table, pos, line_norm, dist_pair2, translator)
           if len(wordform2_list) > 0:
             chv_search_wordform(wordform2_list, config, total_sents, vocab_table, False, dist_pair2)
         print('%d:%s' % (total_sents, line))
@@ -620,35 +617,37 @@ def chv_create_search_index(config):
       words = line.replace('-',' ').translate(translator).split(' ')
       word_ind = 0
       for word in words:
-        debug = word == "хыттӑн"
         if word not in cash_dict.keys():
           for pos in config.pos_list:
             pos_form_found[pos], chosen_pos_form_inf[pos] = chv_search_form(word, pos, config, config.form_list[pos])
           form_found = bool(sum(pos_form_found.values()))
-          vocab[word] = [[str(total_sents), str(word_ind)]]
+          vocab[word] = [[total_sents, word_ind]]
           cash_dict[word] = list(set((chosen_pos_form_inf.values())))
-          if debug: print(cash_dict[word])
         else:
           form_found = True
           tmp = vocab[word]
-          tmp.append([str(total_sents), str(word_ind)])
+          tmp.append([total_sents, word_ind])
           vocab[word] = tmp        
         for chosen_form_inf in cash_dict[word]:
           chosen_form = chosen_form_inf[0]
           if chosen_form != '':
             if chosen_form in index_dict.keys():
               tmp = index_dict[chosen_form]
-              tmp.append([str(total_sents), str(word_ind)])
+              tmp.append([total_sents, word_ind])
               index_dict[chosen_form] = tmp
             else:
-              index_dict[chosen_form] = [[str(total_sents), str(word_ind)]]
+              index_dict[chosen_form] = [[total_sents, word_ind]]
             chosen_form_num = chosen_form + str(total_sents)
-            if chosen_form_num in word_index_dict.keys():
-              tmp = word_index_dict[chosen_form_num]
-              tmp.append(word)
-              word_index_dict[chosen_form_num] = tmp
+            if chosen_form in word_index_dict.keys():
+              if total_sents in word_index_dict[chosen_form].keys():
+                tmp = word_index_dict[chosen_form][total_sents]
+                tmp.append(word_ind)
+                word_index_dict[chosen_form][total_sents] = tmp
+              else:
+                word_index_dict[chosen_form][total_sents] = [word_ind]
             else:
-              word_index_dict[chosen_form_num] = [word]
+              word_index_dict[chosen_form] = {}
+              word_index_dict[chosen_form][total_sents] = [word_ind]
         word_ind += 1
       if form_found:
         found_sents += 1
@@ -669,7 +668,8 @@ if __name__ == '__main__':
   else:
     chv_search(config, show_first_sents)
     
-  #добавить -лӑ/-лӗ/ -ллӑ/-ллӗ [Done]
-  #Добавить все возможные варианты - кил [Done]
-  #Добавить наречие -ӑн/-ӗн/-н типа сиввӗн
-  #Лемма с гласной в конце хула или хул?
+  # Оптимизировать поиск: загрузку и поиск по паре слов
+  # -скер: ӗҫлекенскер, хитрескер, каланӑскер
+  # -и: хитри, илӗмли
+  # -хи:ӗнерхи, ҫулхи 
+  # Лемма с гласной в конце хула или хул?
