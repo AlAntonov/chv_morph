@@ -691,7 +691,7 @@ def chv_create_search_index(config):
 if __name__ == '__main__':
   show_first_sents = int(sys.argv[1])
   has_second_word = int(sys.argv[2])
-  is_index = True
+  is_index = False
   config = Config(has_second_word, is_index)
   
   if is_index:
