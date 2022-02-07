@@ -1,0 +1,11 @@
+verb_h_*_*_*_ps_vi:verb_h_*_*_*_ps:adj_h_vi
+verb_s_*_*_*_ps_vi:verb_s_*_*_*_ps:adj_s_vi
+verb_*_e_1_p_pn_vi:verb_*_e_1_p_pn:adj_*_vi
+noun_*_e_0_pr_vi:noun_*_e_0_pr:adj_*_vi
+adj_*_sr_vi_*:adj_*_sr_vi:noun_s_e_0_*
+verb_h_*_*_*_ps_vi_*:verb_h_*_*_*_ps_vi:noun_s_e_0_-_-_-_*
+verb_s_*_*_*_ps_vi_*:verb_s_*_*_*_ps_vi:noun_s_e_0_-_-_-_*
+verb_*_e_1_p_pn_vi_*:verb_*_e_1_p_pn_vi:noun_s_e_0_-_-_-_*
+verb_h_e_1_p_ps_vj_*:verb_h_e_1_p_ps_vj:noun_s_e_0_-_-_-_*
+verb_s_e_1_p_ps_vj_*:verb_s_e_1_p_ps_vj:noun_s_e_0_-_-_-_*
+verb_*_e_1_p_pn_vj_*:verb_*_e_1_p_pn_vj:noun_s_e_0_-_-_-_*

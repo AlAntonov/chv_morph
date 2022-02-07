@@ -4,6 +4,8 @@ import os
 import numpy as np
 from config import Config
 
+vokal_list = ['а', 'ӑ', 'о', 'у', 'ы', 'ю', 'я', 'е', 'ӗ', 'ӳ', 'и']
+
 def chv_apply_10_rule(word, affix, conj_word):
   # у десяти глаголов на –р (йӗр, кӗр, кӳр, пар, пер, пыр, хур, шӑр, яр конечный звук выпадает
   if word in ['йӗр', 'кӗр', 'кӳр', 'пар', 'пер', 'пыр', 'тӑр', 'хур', 'шӑр', 'яр']:
@@ -176,8 +178,8 @@ def chv_apply_verb_derules(word, conj_table):
   trn_verb = 'нет в словаре'
   inf_verbs.append(word)
   forms.append("h_e_2_p_im")
-  for i in range(-7,0):
-    if word[i:] in conj_table:
+  for i in range(-11,0):
+    if len(word) > -i and word[i:] in conj_table:
       # if word[:i][-1] not in ['а', 'я', 'й']:
       inf_verbs.append(word[:i])
       form = conj_table[word[i:]]
@@ -293,12 +295,16 @@ def chv_apply_verb_derules(word, conj_table):
         # у глаголов оканчивающюхся на 'c' она выпадает
         if word[i:i+1] in ['с']:
           inf_verbs.append(word[:i] + 'с')
+      # для положительной выделительной формы -и
+      #if len(form) >= 13 and form[6] == 'p' and form[11:13] == 'vj':
+      #  # гласная выпадает, согласные 'л', 'р', 'н', 'т', 'ш' после гласной удваиваюся
+      #  chv_apply_vi_derule(word, i, inf_verbs)
       for j in range(len(forms)-1,len(inf_verbs)):
         modal_candidate = inf_verbs[j]
-        # инфинитив оканчивающий на 'й', исключая короткие слова, является кандидатом быть формой 'могу'
-        if len(modal_candidate) > 3 and modal_candidate[-1] == 'й':
-          inf_verbs.append(modal_candidate[:-1])
-          inf_verbs.append(modal_candidate[:-2])
+        # инфинитив оканчивающий на 'й', исключая короткие слова, является кандидатом быть формой 'могу' (замена на 'pu' в conj)
+        #if len(modal_candidate) > 3 and modal_candidate[-1] == 'й':
+        #  inf_verbs.append(modal_candidate[:-1])
+        #  inf_verbs.append(modal_candidate[:-2])
         # инфинитив оканчивающий на 'тар', 'тер', 'ттар', 'ттер', является кандидатом быть понудительной формы
         if modal_candidate[-4:] in ['ттар', 'ттер']:
           inf_verbs.append(modal_candidate[:-4])
@@ -315,32 +321,52 @@ def chv_apply_noun_last_vokal_derule(word, i, inf_verbs):
     return True
   return False
   
-def chv_apply_noun_derules(noun, conj_table):
+def chv_apply_noun_derules(word, conj_table):
   im_nouns = []
   forms = [] # 'форма не найдена'
   form = 'форма не найдена'
   trn_noun = 'нет в словаре'
   #if "e_0_im" in form_list:
-  im_nouns.append(noun)
+  im_nouns.append(word)
   forms.append("h_e_0_im")
-  for i in range(-7,0):
-    if noun[i:] in conj_table:      
+  debug = word == "шывӗнчен"
+  for i in range(-11,0):
+    if len(word) > -i and word[i:] in conj_table:
+      if debug: print(word[i:])
       skip = False
-      form = conj_table[noun[i:]]
+      form = conj_table[word[i:]]
       # для 3-го лица
       if form[4] == '3':
-        skip = chv_apply_noun_last_vokal_derule(noun, i, im_nouns)
+        skip = chv_apply_noun_last_vokal_derule(word, i, im_nouns)
+        # 'т' заменяется на 'ч'
+        if word[i-1] == 'ч':
+          im_nouns.append(word[:i-1] + 'т')
+          skip = True
       # для прилагательных -ллӑ/-ллӗ от существительных
       if form[6:8] == 'pr':
         # у существительных оканчивающюхся на гласную 'л' удваивается
-        if noun[i-1:i] in ['л']:
-          im_nouns.append(noun[:i-1])
-      #if form[2:] in form_list:
+        if word[i-1:i] in ['л']:
+          im_nouns.append(word[:i-1])
+      # для направлений 'алла' от существительных
+      if form[6:8] == 'na' and form[0] == 'y':
+        # у существительных оканчивающюхся на 'й', 'йа' переходит в 'я'
+        im_nouns.append(word[:i] + 'й')
+        skip = True
       if not skip:
-        im_nouns.append(noun[:i])
+        im_nouns.append(word[:i])
       for j in range(len(forms),len(im_nouns)):
         forms.append(form)
   return im_nouns, forms
+
+def chv_apply_vi_derule(word, i, inf_verbs):
+  if len(word) >= 3-i and word[i-1] == word[i-2]:
+    for v in vokal_list:
+      inf_verbs.append(word[:i-1] + v)
+    inf_verbs.append(word[:i-1])
+  elif len(word) >= 3-i and (word[i-1] not in ['л', 'р', 'н', 'т', 'ш'] or word[i-2] not in vokal_list):
+    for v in vokal_list:
+      inf_verbs.append(word[:i] + v)
+    inf_verbs.append(word[:i])
   
 def chv_apply_adj_derules(word, conj_table):
   im_word = []
@@ -349,8 +375,8 @@ def chv_apply_adj_derules(word, conj_table):
   trn_noun = 'нет в словаре'
   im_word.append(word)
   forms.append("h_im")
-  for i in range(-7,0):
-    if word[i:] in conj_table:
+  for i in range(-11,0):
+    if len(word) > -i and word[i:] in conj_table:
       form = conj_table[word[i:]]
       # для наречий -ӑн/-ӗн/-н от прилагательных
       if form[2:4] == 'na':
@@ -364,6 +390,10 @@ def chv_apply_adj_derules(word, conj_table):
       # для наречий -ӑн/-ӗн не действует простое правило добавления суффикса
       if form[2:4] != 'na' or (form[2:4] == 'na' and word[i:] == 'н'):
         im_word.append(word[:i])
+      # для выделительной формы -и
+      if form[2:4] == 'vj':
+        # гласная выпадает, согласные 'л', 'р', 'н', 'т', 'ш' после гласной удваиваюся
+        chv_apply_vi_derule(word, i, im_word)
       for j in range(len(forms),len(im_word)):
         forms.append(form)
   return im_word, forms
@@ -412,7 +442,7 @@ def fix_encoding_lower(word, reverse = True):
     return word.replace('ӗ','ĕ').replace('ӑ','ă').replace('ҫ','ç').replace('ӳ','ÿ')
   else:
     return word.replace('ĕ','ӗ').replace('ă','ӑ').replace('ç','ҫ').replace('ÿ','ӳ')
-
+    
 def get_hs(word):
   hard = ['а', 'ӑ', 'о', 'у', 'ы', 'ю', 'я']
   soft = ['е', 'ӗ', 'ӳ', 'и']
@@ -498,6 +528,7 @@ def chv_search(config, show_first_sents=10):
   all_form2_list = sum(config.form2_list.values(), [])
   wordform_list = chv_get_wordforms_from_lemma(config, all_form_list, config.wordform_list, config.is_lemma, vocab_table)
   wordform2_list = chv_get_wordforms_from_lemma(config, all_form2_list, config.wordform2_list, config.is_lemma2, vocab_table)
+  
     
   if len(all_form_list) > 0 and len(wordform_list) == 0:
     print("первый список форм")
@@ -620,7 +651,7 @@ def chv_create_search_index(config):
         if word not in cash_dict.keys():
           for pos in config.pos_list:
             pos_form_found[pos], chosen_pos_form_inf[pos] = chv_search_form(word, pos, config, config.form_list[pos])
-          form_found = bool(sum(pos_form_found.values()))
+          form_found = form_found or bool(sum(pos_form_found.values()))
           vocab[word] = [[total_sents, word_ind]]
           cash_dict[word] = list(set((chosen_pos_form_inf.values())))
         else:
@@ -660,16 +691,14 @@ def chv_create_search_index(config):
 if __name__ == '__main__':
   show_first_sents = int(sys.argv[1])
   has_second_word = int(sys.argv[2])
-  is_index = False
+  is_index = True
   config = Config(has_second_word, is_index)
   
   if is_index:
     chv_create_search_index(config)
   else:
     chv_search(config, show_first_sents)
-    
-  # Оптимизировать поиск: загрузку и поиск по паре слов
-  # -скер: ӗҫлекенскер, хитрескер, каланӑскер
-  # -и: хитри, илӗмли
-  # -хи:ӗнерхи, ҫулхи 
+  
+  # пересчитать весь, переписать правила
+  # переделать join звездочки на читаемые списки
   # Лемма с гласной в конце хула или хул?
